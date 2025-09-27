@@ -1,0 +1,46 @@
+Metadata-Version: 2.1
+Name: xirr
+Version: 0.1.8
+Summary: xirr and xnpv calculators
+Home-page: https://github.com/tarioch/xirr/
+Author: Patrick Ruckstuhl
+Author-email: patrick@ch.tario.org
+License: MIT
+Project-URL: Bug Tracker, https://github.com/tarioch/xirr/issues
+Project-URL: Documentation, https://xirr.rtfd.io
+Project-URL: Source Code, https://github.com/tarioch/xirr/
+Platform: any
+Classifier: Development Status :: 4 - Beta
+Classifier: Programming Language :: Python
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Office/Business :: Financial
+Classifier: Topic :: Office/Business :: Financial :: Accounting
+Classifier: Topic :: Office/Business :: Financial :: Investment
+Classifier: License :: OSI Approved :: MIT License
+Description-Content-Type: text/x-rst; charset=UTF-8
+License-File: LICENSE.txt
+Requires-Dist: scipy
+Requires-Dist: importlib-metadata ; python_version < "3.8"
+Provides-Extra: testing
+Requires-Dist: pytest ; extra == 'testing'
+Requires-Dist: flake8 ; extra == 'testing'
+
+.. image:: https://img.shields.io/pypi/l/xirr.svg
+   :target: https://pypi.python.org/pypi/xirr
+.. image:: https://img.shields.io/pypi/v/xirr.svg
+   :target: https://pypi.python.org/pypi/xirr
+.. image:: https://readthedocs.org/projects/xirr/badge
+   :target: https://xirr.rtfd.io
+
+
+xirr
+====
+
+Irregular internal rate of return (xirr) and net present value (npv) calculations.
+
+Based on https://stackoverflow.com/questions/8919718/financial-python-library-that-has-xirr-and-xnpv-function
+with some handling for special cases from https://github.com/RayDeCampo/java-xirr/
+
+See the `Documentation <https://xirr.rtfd.io/>`__.
+
+
