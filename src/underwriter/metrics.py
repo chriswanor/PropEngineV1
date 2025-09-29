@@ -1,9 +1,9 @@
 import pandas as pd
 import numpy as np
 import numpy_financial as npf
-
+import xirr
 from underwriter.schema import Assumptions
-from underwriter.engine import build__monthly_cf, _add_income_ops, build_equity_cashflows, build_cashoncash_table
+from underwriter.engine import build_monthly_cf, _add_income_ops, build_equity_cashflows, build_cashoncash_table
 
 def going_in__cap_rate(df: pd.DataFrame, a: Assumptions) -> float:
     noi = df.iloc[0:12]["NetOperatingIncome"].sum()
@@ -31,13 +31,49 @@ def exit_ltv(a: Assumptions, eq: pd.DataFrame) -> float:
     return loan_payoff / s_proceeds if s_proceeds != 0 and loan_payoff != 0 else np.nan
 
 def unlevered_irr(eq: pd.DataFrame) -> float:
-    
-def levered_irr(eq: pd.DataFrame) -> float: ...
-def unlevered_equity_multiple(eq: pd.DataFrame) -> float: ...
-def levered_equity_multiple(eq: pd.DataFrame) -> float: ...
-def avg_unlevered_coc(coc_tbl: pd.DataFrame) -> float: ...
-def avg_levered_coc(coc_tbl: pd.DataFrame) -> float: ...
+    series = eq["UnleveredCashFlow"]
+    lib = {ts.date(): float(val) for ts, val in series.items() if val != 0}
 
-# --- OPERATING ---
-def year1_op_ex_ratio(df: pd.DataFrame) -> float: ...
+    try:
+        ul_xirr = xirr.xirr(lib)
+    except Exception:
+        ul_xirr = None
+
+    return ul_xirr
+
+def levered_irr(eq: pd.DataFrame) -> float:
+    series = eq["LeveredCashFlow"]
+    lib = {ts.date(): float(val) for ts, val in series.items() if val != 0}
+
+    try:
+        l_xirr = xirr.xirr(lib)
+    except Exception:
+        l_xirr = None
+
+    return l_xirr
+
+def unlevered_equity_multiple(eq: pd.DataFrame) -> float:
+    total_invested = eq["UnleveredCashFlow"].loc[eq["UnleveredCashFlow"] < 0].sum()
+    total_returned = eq["UnleveredCashFlow"].loc[eq["UnleveredCashFlow"] > 0].sum()
+    return total_returned / abs(total_invested) if total_invested != 0 else 0
+
+def levered_equity_multiple(eq: pd.DataFrame) -> float:
+    total_invested = eq["LeveredCashFlow"].loc[eq["LeveredCashFlow"] < 0].sum()
+    total_returned = eq["LeveredCashFlow"].loc[eq["LeveredCashFlow"] > 0].sum()
+    return total_returned / abs(total_invested) if total_invested != 0 else 0
+
+def avg_unlevered_coc(coc_tbl: pd.DataFrame, a: Assumptions) -> float:
+    effectivehold = a.hold_period_months if a.hold_period_months <= len(coc_tbl) else len(coc_tbl)
+    avg_ucoc = coc_tbl["UnleveredCashOnCash"].iloc[0:effectivehold].mean()
+    return avg_ucoc
+
+def avg_levered_coc(coc_tbl: pd.DataFrame, a:Assumptions) -> float:
+    effectivehold = a.hold_period_months if a.hold_period_months <= len(coc_tbl) else len(coc_tbl)
+    avg_lcoc = coc_tbl["LeveredCashOnCash"].iloc[0:effectivehold].mean()
+    return avg_lcoc
+
+def year1_op_ex_ratio(df: pd.DataFrame) -> float:
+    total_op_ex = df.iloc[0:12]["OperatingExpenses"].sum()
+    total_egr = df.iloc[0:12]["EffectiveGrossRevenue"].sum()
+    return total_op_ex / total_egr if total_egr != 0 else 0
 

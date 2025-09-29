@@ -94,6 +94,121 @@ def _add_income_ops(df: pd.DataFrame, a: Assumptions) -> pd.DataFrame:
 
     return df
     
+def build_equity_cashflows(a:Assumptions, df_full: pd.DataFrame) -> pd.DataFrame:
+    ops = df_full.iloc[:a.hold_period_months].copy()
+
+    f12_noi = df_full["NetOperatingIncome"].iloc[a.hold_period_months : a.hold_period_months + 12].sum()
+    sale_price_f12 = f12_noi / a.exit_cap_rate
+
+    sale_price = sale_price_f12
+
+    sale_costs = sale_price * a.cost_of_sale_percentage
+
+    loan_amount = a.purchase_price * a.ltv
+    loan_origin_fee = loan_amount * a.loan_origination_fee
+
+    principal_paid = -ops["PrincipalPayment"].sum()
+    loan_payoff_exit = max(loan_amount - principal_paid, 0)
+
+    eq_index = [a.date_of_close] + ops.index.tolist()
+    eq = pd.DataFrame(index = pd.Index(eq_index, name = "Date"))
+
+    eq["PurchasePrice"] = 0.0 
+    eq["ClosingCosts"] = 0.0
+    eq["SaleProceeds"] = 0.0
+    eq["CostOfSale"] = 0.0
+    eq["UnleveredCashFlow"] = 0.0
+    eq["LoanProceeds"] = 0.0
+    eq["LoanOriginationFee"] = 0.0
+    eq["LoanPayoff"] = 0.0
+    eq["LeveredCashFlow"] = 0.0
+
+    eq.iloc[0, eq.columns.get_loc("PurchasePrice")] = -a.purchase_price
+    eq.iloc[0, eq.columns.get_loc("ClosingCosts")] = -a.closing_costs
+    eq.iloc[0, eq.columns.get_loc("LoanProceeds")] = loan_amount
+    eq.iloc[0, eq.columns.get_loc("LoanOriginationFee")] = -loan_origin_fee
+
+    eq.iloc[0, eq.columns.get_loc("UnleveredCashFlow")] = eq.iloc[0]["PurchasePrice"] + eq.iloc[0]["ClosingCosts"]
+    eq.iloc[0, eq.columns.get_loc("LeveredCashFlow")] = eq.iloc[0]["UnleveredCashFlow"] + eq.iloc[0]["LoanProceeds"] + eq.iloc[0]["LoanOriginationFee"]
+
+    eq.iloc[1:, eq.columns.get_loc("UnleveredCashFlow")] = ops["CashFlowBeforeDebtService"].values
+    eq.iloc[1:, eq.columns.get_loc("LeveredCashFlow")] = ops["CashFlowAfterDebtService"].values
+
+    eq.iloc[-1, eq.columns.get_loc("UnleveredCashFlow")] += sale_price - sale_costs
+    eq.iloc[-1, eq.columns.get_loc("LeveredCashFlow")] += sale_price - sale_costs - loan_payoff_exit
+
+    eq.iloc[-1, eq.columns.get_loc("SaleProceeds")] = sale_price
+    eq.iloc[-1, eq.columns.get_loc("CostOfSale")] = -sale_costs
+    eq.iloc[-1, eq.columns.get_loc("LoanPayoff")] = -loan_payoff_exit
+
+    return eq
+
+
+def build_cashoncash_table(a:Assumptions, df_full: pd.DataFrame, eq: pd.DataFrame) -> pd.DataFrame:
+
+    acq = pd.Timestamp(a.date_of_close)
+    idx = pd.DatetimeIndex([acq] + list(df_full.index), name = "Date")
+    cols = [
+        "YearNum",
+        "CashFlowBeforeDebtService",
+        "CashFlowAfterDebtService",
+        "UnleveredCashFlow",
+        "LeveredCashFlow",
+    ]
+
+    tbl = pd.DataFrame(index = idx, columns = cols)
+
+    tbl[:] = 0
+
+    tbl.at[acq, "YearNum"] = 0
+
+    common_df = df_full.index.intersection(tbl.index)
+    if not common_df.empty:
+        tbl.loc[common_df, "YearNum"] = df_full.loc[common_df, "YearNum"]
+        tbl.loc[common_df, "CashFlowBeforeDebtService"] = df_full.loc[common_df, "CashFlowBeforeDebtService"]
+        tbl.loc[common_df, "CashFlowAfterDebtService"] = df_full.loc[common_df, "CashFlowAfterDebtService"]
+
+    common_eq = eq.index.intersection(tbl.index)
+    if not common_eq.empty:
+        tbl.loc[common_eq, "UnleveredCashFlow"] = eq.loc[common_eq, "UnleveredCashFlow"]
+        tbl.loc[common_eq, "LeveredCashFlow"] = eq.loc[common_eq, "LeveredCashFlow"]
+
+
+    hold_years = int(a.hold_period_months / 12)
+    coc_cols = ["UnleveredCashonCash", "LeveredCashonCash"]
+
+    coc_index = pd.Index(np.arange(0, hold_years + 1), name = "Year")
+    coc_tbl = pd.DataFrame(index = coc_index, columns = coc_cols, dtype = float)
+    coc_tbl[:] = np.nan
+
+    unlevered_cost = a.purchase_price + a.closing_costs
+    levered_cost = (unlevered_cost - a.purchase_price * a.ltv + a.purchase_price * a.ltv * a.loan_origination_fee)
+
+    for i in range(1, hold_years + 1):
+        c_mask = tbl["YearNum"] == i
+        unlevered_cf = tbl.loc[c_mask, "UnleveredCashFlow"].sum()
+        levered_cf = tbl.loc[c_mask, "LeveredCashFlow"].sum()
+        coc_tbl.at[i, "UnleveredCashonCash"] = unlevered_cf / unlevered_cost if unlevered_cost != 0 else np.nan
+        coc_tbl.at[i, "LeveredCashonCash"] = levered_cf / levered_cost if levered_cost != 0 else np.nan
+
+    return coc_tbl
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     
 
