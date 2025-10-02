@@ -7,10 +7,10 @@ from underwriter.schema import Assumptions
 
 def build_monthly_cf(a: Assumptions) -> pd.DataFrame:
 
-    # month index: first full month after closing elngth = hold_period_months
-
-    first_month = (a.date_of_close + relativedelta(months=+1)).replace(day=1)
-    idx = pd.date_range(start=first_month, periods = a.hold_period_months + 12, freq = 'MS' )
+    # Month index: use month-end one month after closing
+    # Example: close 2021-03-31 -> first period end 2021-04-30
+    first_period_end = a.date_of_close + relativedelta(months=+1, day=31)
+    idx = pd.date_range(start=pd.Timestamp(first_period_end), periods=a.hold_period_months + 12, freq='M')
 
     # month counter for formulas (n starts at 1)
 
